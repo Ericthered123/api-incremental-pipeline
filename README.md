@@ -39,7 +39,7 @@ Databricks-ready: Architecture mirrors Delta Lake patterns and can scale to Spar
 │ (data/metrics/) │     • Event type counts
 └─────────────────┘     • Repo statistics
                         • Time series
-
+```
 
 ## Component Diagram
 
@@ -57,7 +57,7 @@ Databricks-ready: Architecture mirrors Delta Lake patterns and can scale to Spar
 │  │ (Checkpoint)│  │  (Jsonnet)  │                   │
 │  └─────────────┘  └─────────────┘                   │
 └──────────────────────────────────────────────────────┘
-
+```
 
 
 ## Key Concepts Demonstrated
