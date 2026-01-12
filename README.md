@@ -15,6 +15,8 @@ Databricks-ready: Architecture mirrors Delta Lake patterns and can scale to Spar
 
 
 ## Medallion Architecture
+
+```text
 ┌─────────────────┐
 │   GitHub API    │
 └────────┬────────┘
@@ -41,6 +43,7 @@ Databricks-ready: Architecture mirrors Delta Lake patterns and can scale to Spar
 
 ## Component Diagram
 
+```text
 ┌──────────────────────────────────────────────────────┐
 │                   Main Orchestrator                   │
 │                                                       │
