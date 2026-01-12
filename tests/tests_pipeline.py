@@ -24,6 +24,7 @@ En Databricks:
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
+from requests.exceptions import RequestException
 import json
 
 # Importamos módulos a testear
@@ -31,10 +32,10 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from fetch import APIFetcher
-from state import StateManager
-from transform import EventTransformer
-from metrics import MetricsCalculator
+from src.fetch import APIFetcher
+from src.state import StateManager
+from src.transform import EventTransformer
+from src.metrics import MetricsCalculator
 
 
 class TestAPIFetcher(unittest.TestCase):
@@ -57,7 +58,7 @@ class TestAPIFetcher(unittest.TestCase):
             max_retries=2
         )
     
-    @patch('fetch.requests.Session.get')
+    @patch('src.fetch.requests.Session.get')
     def test_fetch_events_success(self, mock_get):
         """
         CONCEPTO: Mocking External Dependencies
@@ -97,7 +98,7 @@ class TestAPIFetcher(unittest.TestCase):
         self.assertIn('_ingestion_timestamp', events[0])
         self.assertIn('_source', events[0])
     
-    @patch('fetch.requests.Session.get')
+    @patch('src.fetch.requests.Session.get')
     def test_fetch_events_304_not_modified(self, mock_get):
         """
         Test del caso incremental: no hay datos nuevos.
@@ -111,7 +112,7 @@ class TestAPIFetcher(unittest.TestCase):
         # Debería devolver lista vacía (no hay datos nuevos)
         self.assertEqual(len(events), 0)
     
-    @patch('fetch.requests.Session.get')
+    @patch('src.fetch.requests.Session.get')
     def test_fetch_events_retry_on_failure(self, mock_get):
         """
         CONCEPTO: Testing Retry Logic
@@ -119,22 +120,27 @@ class TestAPIFetcher(unittest.TestCase):
         Verificamos que el retry funciona correctamente.
         """
         # Primera llamada falla, segunda funciona
-        mock_get.side_effect = [
-            Exception("Network error"),
-            Mock(
-                status_code=200,
-                headers={},
-                json=lambda: [{'id': '1', 'type': 'PushEvent', 'created_at': '2024-01-15T10:00:00Z', 
-                              'repo': {'id': 1, 'name': 'test/repo'}, 'actor': {'id': 1, 'login': 'user1'}, 'payload': {}}]
-            )
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.headers = {}
+        mock_response.json.return_value = [
+            {'id': '1', 'type': 'PushEvent', 'created_at': '2024-01-15T10:00:00Z',
+            'repo': {'id': 1, 'name': 'test/repo'},
+            'actor': {'id': 1, 'login': 'user1'},
+            'payload': {}}
         ]
         
+        # Primera llamada falla con RequestException, segunda funciona
+        mock_get.side_effect = [
+            RequestException("Network error"),
+            mock_response
+        ]
+
         events = self.fetcher.fetch_events('test', 'repo')
-        
-        # Debería haber reintentado y obtenido 1 evento
-        self.assertEqual(len(events), 1)
-        # Verificamos que llamó 2 veces (1 fallo + 1 éxito)
-        self.assertEqual(mock_get.call_count, 2)
+
+        assert len(events) == 1
+        assert events[0]['id'] == '1'
+        assert mock_get.call_count == 2
 
 
 class TestStateManager(unittest.TestCase):
