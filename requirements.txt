@@ -1,0 +1,11 @@
+# Core dependencies
+requests>=2.31.0          # HTTP client for API calls
+python-dateutil>=2.8.2    # Date parsing and manipulation
+
+# Testing
+pytest>=7.4.0             # Testing framework
+pytest-cov>=4.1.0         # Coverage reporting
+pytest-mock>=3.11.1       # Mocking utilities
+
+# Configuration
+jsonnet>=0.20.0           # Jsonnet config parser (optional)
