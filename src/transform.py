@@ -58,7 +58,14 @@ class EventTransformer:
 
         logger.info(f"Transformed {len(transformed)} events")
         return transformed
+    
+    def transform_batch(self, events: List[Dict]) -> List[Dict]:
+        return self.transform(events)
 
+    def enrich_event(self, event: Dict) -> Dict:
+        # Hoy ya está todo enriquecido en _normalize_event
+        # Dejamos el hook para futuro (muy bien visto)
+        return event
     def _normalize_event(self, event: Dict) -> Dict:
         """
         CONCEPTO: Schema enforcement
