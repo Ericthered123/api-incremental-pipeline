@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+
+# =====================================
+# Data pipeline outputs (DO NOT COMMIT)
+# =====================================
+data/
 # Distribution / packaging
 .Python
 build/
