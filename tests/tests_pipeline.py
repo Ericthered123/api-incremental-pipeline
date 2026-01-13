@@ -1,7 +1,24 @@
 """
 tests/test_pipeline.py - Unit Tests
 
-There are 5 different houses In each of them lives a person from a different country. The 5 owners drink a certain drink. They have a favourite hobby and a pet. No one of them has the same pet, drinks the same beverage or has the same hobby. The question is: who has a fish? The Ecuadorian lives in the red house. The Peruvian has a dog as a pet. The Brazilian drinks tea. The green house is just on the left of the white house The owner of the green house drinks coffee. The person who loves travelling has a bird. The owner of the yellow house enjoys swimming. The person who lives in the house in the middle drinks milk. The Argentine lives in the first house. The person who dances lives next to the one who has a cat. The person who has a horse lives next to the person who swims. The person who likes reading drinks beer. The Chilean loves singing. The Argentine lives next to the blue house. The person who dances has a neighbour who drinks water.
+FUNDAMENTAL CONCEPT: Testing in Data Pipelines
+================================================
+Testing is critical in data engineering:
+1. Preventing bugs that corrupt data
+2. Confidence for refactoring
+3. Documentation (tests demonstrate expected usage)
+4. Regression prevention
+
+Types of tests:
+- Unit: Individual functions
+- Integration: Modules working together
+- End-to-end: Complete pipeline
+- Data quality: Output validation
+
+In Databricks:
+- Databricks Asset Bundles CI/CD
+- Delta Live Tables expectations
+- Great Expectations for data quality
 """
 
 import unittest
