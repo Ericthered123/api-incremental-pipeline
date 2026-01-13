@@ -1,42 +1,43 @@
 /*
 config.jsonnet - Configuration as Code
 
-CONCEPTO FUNDAMENTAL: Configuration Management
-==============================================
-Separar configuración del código tiene beneficios:
-1. Cambiar config sin tocar código
-2. Diferentes configs por ambiente (dev/staging/prod)
-3. Versionado de configuración
-4. Type safety y validación
+FUNDAMENTAL CONCEPT: Configuration Management
+===============================================
+Separating configuration from code has benefits:
+1. Changing configurations without touching code
+2. Different configurations for each environment (dev/staging/prod)
+3. Configuration versioning
+4. Type safety and validation
 
-¿Por qué Jsonnet y no YAML/JSON?
-================================
-Jsonnet es JSON + lógica:
-- Variables y funciones
-- Herencia y composición
-- Evita duplicación (DRY)
-- Validación en compile-time
+Why JSONNET and not YAML/JSON?
 
-En Databricks:
-- Databricks Asset Bundles usa YAML similar
-- Terraform HCL también es declarativo con lógica
+=================================
+Jsonnet is JSON + logic:
+- Variables and functions
+- Inheritance and composition
+- Prevents duplication (DRY)
+- Compile-time validation
+
+In Databricks:
+- Databricks Asset Bundles uses similar YAML
+- Terraform HCL is also declarative with logic
 */
 
-// CONCEPTO: Local Variables
-// Define constantes reutilizables
+// CONCEPT: Local Variables
+// Defines reusable constants
 local base_url = 'https://api.github.com';
 local data_dir = 'data';
 
-// CONCEPTO: Function (reutilización)
-// Función que crea config de retry
+// CONCEPT: Function (reuse)
+// Function that creates a retry configuration
 local retryConfig(max_retries=3, backoff=2) = {
   max_retries: max_retries,
   backoff_factor: backoff,
   timeout: 10,
 };
 
-// CONCEPTO: Object Composition
-// Diferentes ambientes heredan de base config
+// CONCEPT: Object Composition
+// Different environments inherit from the base configuration
 local baseConfig = {
   // API Configuration
   api: {
@@ -45,7 +46,8 @@ local baseConfig = {
       events: '/repos/{owner}/{repo}/events',
       repo: '/repos/{owner}/{repo}',
     },
-    // Aplicamos la función de retry
+    // We apply the retry function
+
     retry: retryConfig(max_retries=3, backoff=2),
     // Rate limiting (GitHub: 60 req/hour sin auth)
     rate_limit: {
@@ -77,7 +79,7 @@ local baseConfig = {
 
   // Transformation configuration
   transform: {
-    // Solo procesar estos tipos de eventos
+    // Only process these types of events
     event_types_filter: [
       'PushEvent',
       'PullRequestEvent',
@@ -91,7 +93,7 @@ local baseConfig = {
 
   // Metrics configuration
   metrics: {
-    // Calcular estas agregaciones
+    // Calculate these aggregations
     calculations: [
       'event_types',
       'repos',
@@ -99,7 +101,7 @@ local baseConfig = {
       'time_series',
       'activity',
     ],
-    // Top N para rankings
+    // Top N for rankings
     top_n: 10,
   },
 
@@ -112,7 +114,7 @@ local baseConfig = {
 };
 
 // CONCEPTO: Environment-specific Configuration
-// Dev config: más logging, menos repos
+// Dev config: more logging, less repos
 local devConfig = baseConfig {
   logging+: {
     level: 'DEBUG',
@@ -122,33 +124,33 @@ local devConfig = baseConfig {
   ],
   api+: {
     retry+: {
-      max_retries: 2,  // Menos retries en dev
+      max_retries: 2,  // less retries en dev
     },
   },
 };
 
-// Prod config: optimizado para performance
+// Prod config: optimized for performance
 local prodConfig = baseConfig {
   api+: {
     retry+: {
-      max_retries: 5,  // Más retries en prod
+      max_retries: 5,  // more retries en prod
       backoff_factor: 3,
     },
   },
   logging+: {
-    level: 'WARNING',  // Solo warnings/errors en prod
+    level: 'WARNING',  // only warnings/errors en prod
   },
 };
 
 // CONCEPTO: Conditional Export
-// Exporta config según variable de ambiente
-// En uso real: jsonnet -V env=prod config.jsonnet
+// Export config according to var of env 
+// In real case-scenario: jsonnet -V env=prod config.jsonnet
 {
   // Default: dev config
   dev: devConfig,
   prod: prodConfig,
   
-  // Helper: función para obtener config por ambiente
+  // Helper: func to obtain config por env
   getConfig(env='dev'):: 
     if env == 'prod' then prodConfig
     else devConfig,

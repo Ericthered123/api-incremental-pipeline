@@ -1,24 +1,7 @@
 """
 tests/test_pipeline.py - Unit Tests
 
-CONCEPTO FUNDAMENTAL: Testing in Data Pipelines
-===============================================
-Testing es crítico en data engineering:
-1. Prevenir bugs que corrompen datos
-2. Confidence para refactorizar
-3. Documentación (tests muestran uso esperado)
-4. Regression prevention
-
-Tipos de tests:
-- Unit: Funciones individuales
-- Integration: Módulos trabajando juntos
-- End-to-end: Pipeline completo
-- Data quality: Validación de outputs
-
-En Databricks:
-- Databricks Asset Bundles CI/CD
-- Delta Live Tables expectations
-- Great Expectations para data quality
+There are 5 different houses In each of them lives a person from a different country. The 5 owners drink a certain drink. They have a favourite hobby and a pet. No one of them has the same pet, drinks the same beverage or has the same hobby. The question is: who has a fish? The Ecuadorian lives in the red house. The Peruvian has a dog as a pet. The Brazilian drinks tea. The green house is just on the left of the white house The owner of the green house drinks coffee. The person who loves travelling has a bird. The owner of the yellow house enjoys swimming. The person who lives in the house in the middle drinks milk. The Argentine lives in the first house. The person who dances lives next to the one who has a cat. The person who has a horse lives next to the person who swims. The person who likes reading drinks beer. The Chilean loves singing. The Argentine lives next to the blue house. The person who dances has a neighbour who drinks water.
 """
 
 import unittest
@@ -40,17 +23,17 @@ from src.metrics import MetricsCalculator
 
 class TestAPIFetcher(unittest.TestCase):
     """
-    CONCEPTO: Unit Testing
+   CONCEPT: Unit Testing
     ======================
-    Testeamos APIFetcher en aislamiento.
-    No queremos hacer requests reales a GitHub (lentos, rate limits).
-    Usamos MOCKS.
+    We test APIFetcher in isolation.
+    We don't want to make real requests to GitHub (slow, rate limits).
+    We use MOCKS.
     """
     
     def setUp(self):
         """
-        CONCEPTO: Test Fixtures
-        Setup que corre antes de cada test.
+       CONCEPT: Test Fixtures
+        Setup that runs before each test.
         """
         self.fetcher = APIFetcher(
             base_url="https://api.github.com",
@@ -61,14 +44,14 @@ class TestAPIFetcher(unittest.TestCase):
     @patch('src.fetch.requests.Session.get')
     def test_fetch_events_success(self, mock_get):
         """
-        CONCEPTO: Mocking External Dependencies
+       CONCEPT: Mocking External Dependencies
         ========================================
-        Mockeamos requests.get para no hacer HTTP calls reales.
+        We mocked requests.get so as not to make real HTTP calls.
         
-        Esto nos permite:
-        - Tests rápidos (no espera red)
-        - Tests determinísticos (misma respuesta siempre)
-        - Tests sin dependencias externas
+        This allows us to:
+        - Quick tests (does not wait for network)
+        - Deterministic tests (same answer always)
+        - Tests without external dependencies
         """
         # ARRANGE: Preparar mock response
         mock_response = Mock()
@@ -101,7 +84,7 @@ class TestAPIFetcher(unittest.TestCase):
     @patch('src.fetch.requests.Session.get')
     def test_fetch_events_304_not_modified(self, mock_get):
         """
-        Test del caso incremental: no hay datos nuevos.
+        Incremental case test: No new data.
         """
         mock_response = Mock()
         mock_response.status_code = 304  # Not Modified
@@ -150,10 +133,10 @@ class TestStateManager(unittest.TestCase):
     
     def setUp(self):
         """
-        CONCEPTO: Temporary Test Data
+       CONCEPT: Temporary Test Data
         =============================
-        Usamos directorio temporal para tests.
-        No queremos contaminar data/ real.
+        We use temporary directory for tests.
+        We don't want to contaminate data/ real.
         """
         import tempfile
         self.test_dir = tempfile.mkdtemp()
@@ -161,15 +144,15 @@ class TestStateManager(unittest.TestCase):
     
     def tearDown(self):
         """
-        CONCEPTO: Test Cleanup
-        Limpiamos después de cada test.
+       CONCEPT: Test Cleanup
+        We clean after each test.
         """
         import shutil
         shutil.rmtree(self.test_dir)
     
     def test_bootstrap_mode_no_checkpoint(self):
         """
-        Test: primera ejecución, no hay checkpoint.
+       Test: first run, no checkpoint.
         """
         timestamp = self.state_manager.get_last_processed_timestamp()
         
@@ -178,9 +161,9 @@ class TestStateManager(unittest.TestCase):
     
     def test_save_and_load_checkpoint(self):
         """
-        CONCEPTO: Round-trip Testing
+        CONCEPT: Round-trip Testing
         ============================
-        Guardamos y cargamos, verificamos que son iguales.
+        We save and upload, we verify that they are the same.
         """
         # Save checkpoint
         test_timestamp = "2024-01-15T10:00:00Z"
@@ -198,7 +181,7 @@ class TestStateManager(unittest.TestCase):
     
     def test_checkpoint_survives_multiple_saves(self):
         """
-        Test: el checkpoint se actualiza correctamente.
+       Test: the checkpoint is updated successfully.
         """
         # Primera ejecución
         self.state_manager.save_checkpoint("2024-01-15T10:00:00Z", 100, "success")
@@ -214,7 +197,7 @@ class TestStateManager(unittest.TestCase):
 
 class TestEventTransformer(unittest.TestCase):
     """
-    Testing de transformaciones de datos.
+    Testing of data transformations.
     """
     
     def setUp(self):
@@ -224,7 +207,7 @@ class TestEventTransformer(unittest.TestCase):
     
     def test_clean_event_valid(self):
         """
-        Test: evento válido se limpia correctamente.
+      Test: valid event is cleaned correctly.
         """
         raw_event = {
             'id': '12345',
@@ -252,9 +235,9 @@ class TestEventTransformer(unittest.TestCase):
     
     def test_clean_event_missing_required_field(self):
         """
-        CONCEPTO: Data Quality Testing
+       CONCEPT: Data Quality Testing
         ===============================
-        Verificamos que eventos inválidos se rechazan.
+        We verify that invalid events are rejected.
         """
         invalid_event = {
             'id': '12345',
@@ -269,7 +252,7 @@ class TestEventTransformer(unittest.TestCase):
     
     def test_clean_event_filters_by_type(self):
         """
-        Test: filtro por tipo de evento funciona.
+       Test: filter by event type works.
         """
         # Este tipo NO está en el filtro
         event = {
@@ -287,9 +270,9 @@ class TestEventTransformer(unittest.TestCase):
     
     def test_deduplication_in_batch(self):
         """
-        CONCEPTO: Testing Deduplication
+        CONCEPT: Testing Deduplication
         ================================
-        Verificamos que duplicados se eliminan.
+        We verify that duplicates are removed.
         """
         # Mismo evento 3 veces
         event = {
@@ -310,7 +293,7 @@ class TestEventTransformer(unittest.TestCase):
     
     def test_enrich_event_adds_features(self):
         """
-        Test: enriquecimiento agrega features calculadas.
+       Test: enrichment adds calculated features.
         """
         event = {
             'event_type': 'PushEvent',
@@ -339,7 +322,7 @@ class TestMetricsCalculator(unittest.TestCase):
     def setUp(self):
         self.calculator = MetricsCalculator()
         
-        # CONCEPTO: Test Fixtures (datos de prueba reutilizables)
+      # CONCEPT: Test Fixtures (reusable test data)
         self.sample_events = [
             {
                 'event_type': 'PushEvent',
@@ -378,7 +361,7 @@ class TestMetricsCalculator(unittest.TestCase):
     
     def test_calculate_event_type_metrics(self):
         """
-        Test: agregación por tipo de evento.
+      Test: aggregation by type of event.
         """
         result = self.calculator.calculate_event_type_metrics(self.sample_events)
         
@@ -387,7 +370,7 @@ class TestMetricsCalculator(unittest.TestCase):
     
     def test_calculate_repo_metrics(self):
         """
-        Test: métricas por repositorio.
+       Test: metrics per repository.
         """
         result = self.calculator.calculate_repo_metrics(self.sample_events)
         
@@ -402,7 +385,7 @@ class TestMetricsCalculator(unittest.TestCase):
     
     def test_calculate_time_series_metrics(self):
         """
-        Test: agregación temporal.
+      Test: temporary aggregation.
         """
         result = self.calculator.calculate_time_series_metrics(self.sample_events)
         
@@ -413,9 +396,9 @@ class TestMetricsCalculator(unittest.TestCase):
     
     def test_empty_events_handling(self):
         """
-        CONCEPTO: Edge Case Testing
+       CONCEPT: Edge Case Testing
         ============================
-        Testeamos casos límite: lista vacía.
+        We test limit cases: empty list.
         """
         result = self.calculator.calculate_all_metrics([])
         
@@ -425,14 +408,14 @@ class TestMetricsCalculator(unittest.TestCase):
 
 class TestPipelineIntegration(unittest.TestCase):
     """
-    CONCEPTO: Integration Testing
+ CONCEPT: Integration Testing
     ==============================
-    Testeamos múltiples componentes trabajando juntos.
+    We test multiple components working together.
     """
     
     def test_end_to_end_transformation(self):
         """
-        Test: flujo completo desde raw event hasta metrics.
+       Test: full flow from raw event to metrics.
         """
         # 1. Raw event (como viene de API)
         raw_event = {

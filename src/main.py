@@ -1,23 +1,22 @@
 """
 main.py - Pipeline Orchestrator
 
-CONCEPTO FUNDAMENTAL: Orchestration
-===================================
-Este es el "director de orquesta" del pipeline.
-Coordina todos los módulos para ejecutar el flujo completo:
+FUNDAMENTAL CONCEPT: Orchestration
+====================================
+This is the "conductor" of the pipeline. It coordinates all modules to execute the complete flow:
 
-1. Cargar configuración
-2. Cargar checkpoint (¿dónde nos quedamos?)
-3. Fetch datos incrementales de API
-4. Transform (limpiar y validar)
+1. Load configuration
+2. Load checkpoint (where were we?)
+3. Fetch incremental data from the API
+4. Transform (clean and validate)
 5. Calculate metrics
-6. Persist resultados
+6. Persist results
 7. Save checkpoint
 
-En Databricks:
-- Databricks Workflows orquesta notebooks
-- Delta Live Tables orquesta pipelines declarativamente
-- Jobs API para programar ejecuciones
+In Databricks:
+- Databricks Workflows orchestrate notebooks
+- Delta Live Tables orchestrate pipelines declaratively
+- Jobs API for scheduling executions
 """
 
 import json
@@ -43,15 +42,19 @@ logger = logging.getLogger(__name__)
 
 class Pipeline:
     """
-    CONCEPTO: Pipeline Pattern
+    CONCEPT: Pipeline Pattern
     ==========================
-    Encapsula toda la lógica del pipeline en una clase.
-    
-    Ventajas:
-    - Estado centralizado (config, managers)
-    - Fácil de testear (mock dependencies)
-    - Reutilizable (diferentes configs)
-    - Orchestrable (puede ser llamado por scheduler)
+    Encapsulates all pipeline logic in a single class.
+
+    Advantages:
+
+    - Centralized state (config, managers)
+
+    - Easy to test (mock dependencies)
+
+    - Reusable (different configurations)
+
+    - Orchestrable (can be called by a scheduler)
     """
     
     def __init__(self, config: Dict):
@@ -90,8 +93,8 @@ class Pipeline:
     def _setup_directories(self):
         """
         BEST PRACTICE: Idempotent Setup
-        Crear directorios es una operación idempotente.
-        Podemos ejecutarla múltiples veces sin problemas.
+        Creating directories is an idempotent operation.
+        We can run it multiple times without problems.
         """
         for path_key, path_value in self.config['paths'].items():
             Path(path_value).mkdir(parents=True, exist_ok=True)
@@ -101,8 +104,9 @@ class Pipeline:
     def _save_json(self, data: any, filepath: Path):
         """
         BEST PRACTICE: Atomic Write
-        Guardamos a archivo temporal primero, luego rename.
-        Esto previene archivos corruptos si el proceso muere.
+        We save to a temporary file first, then rename it.
+
+        This prevents corrupted files if the process terminates.
         """
         temp_file = filepath.with_suffix('.tmp')
         
@@ -121,18 +125,23 @@ class Pipeline:
     
     def run(self) -> Dict:
         """
-        Ejecuta el pipeline completo.
-        
-        CONCEPTO: Transaction-like Execution
-        ====================================
-        El pipeline funciona como una transacción:
-        1. Start run (tracking)
-        2. Execute steps
-        3. Si todo OK: commit (save checkpoint)
-        4. Si falla: rollback (no avanzar checkpoint)
-        
-        Returns:
-            Dict con estadísticas de la ejecución
+        Execute the entire pipeline.
+
+            CONCEPT: Transaction-like Execution
+
+            ===================================
+            The pipeline functions like a transaction:
+
+            1. Start run (tracking)
+
+            2. Execute steps
+
+            3. If everything is OK: commit (save checkpoint)
+
+            4. If it fails: rollback (do not advance to the checkpoint)
+
+            Returns:
+            Dict with execution statistics
         """
         run_id = self.run_tracker.start_run()
         logger.info(f"=== Pipeline Started (run_id: {run_id}) ===")
@@ -196,14 +205,17 @@ class Pipeline:
             logger.error(f"Pipeline failed: {str(e)}", exc_info=True)
             stats['error'] = str(e)
             
-            # CONCEPTO: Failure Handling
-            # Marcamos el fallo pero NO avanzamos el checkpoint
-            # Próxima ejecución reintentará desde el mismo punto
+            # CONCEPT: Failure Handling
+
+            # We mark the failure but do NOT advance the checkpoint
+
+            # The next execution will retry from the same point
             self.state_manager.mark_failed(str(e))
         
         finally:
-            # CONCEPTO: Cleanup & Finalization
-            # Siempre guardamos el tracking, incluso si falla
+            # CONCEPT: Cleanup & Finalization
+
+            # We always keep the tracking data, even if it fails
             self.run_tracker.end_run(
                 records_processed=stats['records_processed'],
                 status=stats['status'],
@@ -214,14 +226,18 @@ class Pipeline:
     
     def _fetch_events(self, since: str = None) -> List[Dict]:
         """
-        Fetches events from configured repos.
-        
-        CONCEPTO: Batch Fetch
-        =====================
-        En producción real, esto podría:
-        - Paralelizarse (multiprocessing/threading)
-        - Usar connection pooling
-        - Implementar circuit breaker pattern
+        Fetches events from configured repositories.
+
+            CONCEPT: Batch Fetch
+
+            ====================
+            In a real production environment, this could:
+
+            - Be parallelized (multiprocessing/threading)
+
+            - Use connection pooling
+
+            - Implement a circuit breaker pattern
         """
         repos = [(r['owner'], r['name']) for r in self.config['repos']]
         
@@ -233,11 +249,11 @@ class Pipeline:
             all_events.extend(events)
         
         # CONCEPTO: Data Validation
-        # Verificamos que recibimos datos válidos
+        # We verified that we received valid data
         if all_events:
             logger.info(f"Fetched events date range: {min(e['created_at'] for e in all_events)} to {max(e['created_at'] for e in all_events)}")
         
-        # Guardamos raw data (Bronze layer)
+        # We save raw data (Bronze layer)
         timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
         raw_file = Path(self.config['paths']['raw']) / f'events_{timestamp}.json'
         self._save_json(all_events, raw_file)
@@ -255,7 +271,7 @@ class Pipeline:
         # Enrich each event
         enriched = [self.transformer.enrich_event(e) for e in transformed]
         
-        # Guardamos curated data (Silver layer)
+        # We save curated data (Silver layer)
         timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
         curated_file = Path(self.config['paths']['curated']) / f'events_curated_{timestamp}.json'
         self._save_json(enriched, curated_file)
@@ -287,15 +303,19 @@ class Pipeline:
     def _persist_results(self, raw: List[Dict], curated: List[Dict], metrics: Dict):
         """
         Persists final results.
-        
-        CONCEPTO: Multiple Output Formats
-        ==================================
-        Guardamos en diferentes formatos según uso:
-        - JSON: Fácil de leer, debugging
-        - CSV: Para análisis en Excel/pandas
-        - Parquet: Formato columnar eficiente (en producción)
-        
-        En Databricks: Delta Lake maneja esto automáticamente
+
+        CONCEPT: Multiple Output Formats
+
+        =================================
+        We save in different formats depending on the use:
+
+        - JSON: Easy to read, debugging
+
+        - CSV: For analysis in Excel/Pandas
+
+        - Parquet: Efficient columnar format (in production)
+
+        In Databricks: Delta Lake handles this automatically
         """
         timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
         
@@ -310,21 +330,25 @@ class Pipeline:
     
     def _save_checkpoint(self, events: List[Dict]):
         """
-        Saves checkpoint for incremental processing.
-        
-        CONCEPTO: Watermark
-        ===================
-        El checkpoint guarda la "marca de agua" (watermark):
-        el último timestamp procesado exitosamente.
-        
-        En Structured Streaming, esto se llama "watermark" y
-        se usa para windowed aggregations y late data handling.
+       Saves checkpoint for incremental processing.
+
+        CONCEPT: Watermark
+
+        ==================
+        The checkpoint saves the "watermark":
+
+        the last timestamp successfully processed.
+
+        In Structured Streaming, this is called a "watermark" and
+
+        is used for windowed aggregations and late data handling.
         """
         if not events:
             return
         
-        # IMPORTANTE: Usamos el timestamp MÁS RECIENTE procesado
-        # Esto garantiza que próxima ejecución no reprocesa
+        #IMPORTANT: We use the most recently processed timestamp.
+
+        # This ensures that the next execution does not reprocess.
         last_timestamp = max(e['created_at'] for e in events)
         
         self.state_manager.save_checkpoint(
@@ -336,14 +360,19 @@ class Pipeline:
 
 def load_config(env: str = 'dev') -> Dict:
     """
-    Loads configuration from jsonnet file.
-    
-    CONCEPTO: Configuration Loading
-    ================================
-    En producción, esto podría:
-    - Leer de environment variables
-    - Usar secret managers (AWS Secrets Manager, Azure Key Vault)
-    - Merge múltiples fuentes de config
+
+    Loads configuration from a JSONnet file.
+
+    CONCEPT: Configuration Loading
+
+    ===============================
+    In production, this could:
+
+    - Read from environment variables
+
+    - Use secret managers (AWS Secrets Manager, Azure Key Vault)
+
+    - Merge multiple configuration sources
     """
     import subprocess
     
@@ -391,12 +420,15 @@ def load_config(env: str = 'dev') -> Dict:
 def main():
     """
     Entry point for the pipeline.
-    
-    CONCEPTO: CLI Interface
-    =======================
-    El pipeline se puede ejecutar desde command line:
-    python main.py
-    python main.py --env prod
+
+        CONCEPT: CLI Interface
+
+        ======================
+        The pipeline can be executed from the command line:
+
+        python main.py
+
+        python main.py --env prod
     """
     import argparse
     
@@ -419,7 +451,7 @@ def main():
     stats = pipeline.run()
     
     # Exit with appropriate code
-    # BEST PRACTICE: Exit codes para automation
+    # BEST PRACTICE: Exit codes for automation
     # 0 = success, 1 = failure
     sys.exit(0 if stats['status'] == 'success' else 1)
 

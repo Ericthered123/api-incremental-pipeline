@@ -1,21 +1,23 @@
 """
 state.py - Checkpoint Management Module
 
-CONCEPTO FUNDAMENTAL: Stateful Processing
-==========================================
-Un pipeline de datos necesita "recordar" dónde se quedó.
-Esto se llama "checkpoint" o "state management".
+FUNDAMENTAL CONCEPT: Stateful Processing
+===========================================
+A data pipeline needs to "remember" where it left off.
 
-Analogía: Es como marcar la página de un libro.
-- Cierras el libro (pipeline termina)
-- Volvés más tarde (próxima ejecución)
-- Abrís en la página marcada (checkpoint)
-- No releés todo desde el principio
+This is called "checkpoints" or "state management."
 
-En Databricks:
-- Delta Lake maneja esto automáticamente con ACID transactions
-- Structured Streaming usa checkpoints en cloud storage
-- Nosotros lo simulamos con archivos JSON (simple pero efectivo)
+Analogy: It's like marking a page in a book.
+
+- You close the book (pipeline ends)
+- You come back later (next execution)
+- You open to the marked page (checkpoint)
+- You don't reread everything from the beginning
+
+In Databricks:
+- Delta Lake handles this automatically with ACID transactions
+- Structured Streaming uses checkpoints in cloud storage
+- We simulate it with JSON files (simple but effective)
 """
 
 import json
@@ -30,31 +32,43 @@ logger = logging.getLogger(__name__)
 
 class StateManager:
     """
-    CONCEPTO: State Management
-    ==========================
-    Maneja el estado del pipeline entre ejecuciones.
-    
-    ¿Qué guardamos?
-    - Timestamp del último dato procesado exitosamente
-    - Contadores (records procesados, errores)
-    - Metadata de la ejecución (start_time, end_time, status)
-    
-    ¿Por qué es importante?
-    1. **Incremental processing**: Solo procesamos lo nuevo
-    2. **Fault tolerance**: Si falla, sabemos dónde retomar
-    3. **Idempotencia**: Múltiples ejecuciones = mismo resultado
-    4. **Auditoría**: Sabemos qué se procesó y cuándo
+    CONCEPT: State Management
+
+        ==========================
+        Manages the pipeline state between executions.
+
+        What do we store?
+
+        - Timestamp of the last successfully processed data
+
+        - Counters (records processed, errors)
+
+        - Execution metadata (start_time, end_time, status)
+
+        Why is it important?
+
+        1. **Incremental processing**: We only process new data
+
+        2. **Fault tolerance**: If a process fails, we know where to resume
+
+        3. **Idempotence**: Multiple executions = same result
+
+        4. **Auditing**: We know what was processed and when
     """
     
     def __init__(self, state_dir: str = "data/state"):
         """
         Args:
-            state_dir: Directorio donde guardamos checkpoints
-        
+
+        state_dir: Directory where checkpoints are stored
+
         BEST PRACTICE: Separation of data by purpose
-        - data/raw: Datos crudos de la API
-        - data/curated: Datos limpiados
-        - data/state: Metadata del pipeline
+
+        - data/raw: Raw API data
+
+        - data/curated: Cleaned data
+
+        - data/state: Pipeline metadata
         """
         self.state_dir = Path(state_dir)
         self.state_dir.mkdir(parents=True, exist_ok=True)
@@ -62,15 +76,17 @@ class StateManager:
         
     def load_checkpoint(self) -> Optional[Dict]:
         """
-        Carga el último checkpoint guardado.
-        
-        CONCEPTO: Checkpoint Recovery
-        =============================
-        Si el pipeline corrió antes, tenemos un checkpoint.
-        Si es la primera vez, devolvemos None (bootstrap mode).
-        
+        Load the last saved checkpoint.
+
+        CONCEPT: Checkpoint Recovery
+
+        ============================
+        If the pipeline ran before, we have a checkpoint.
+
+        If it's the first time, we return None (bootstrap mode).
+
         Returns:
-            Dict con el estado, o None si no existe
+        Dict with the state, or None if it doesn't exist
         """
         if not self.state_file.exists():
             logger.info("No previous checkpoint found (bootstrap mode)")
@@ -85,9 +101,9 @@ class StateManager:
             
         except json.JSONDecodeError as e:
             logger.error(f"Corrupted checkpoint file: {e}")
-            # CONCEPTO: Fail-safe behavior
-            # Si el checkpoint está corrupto, es más seguro empezar de nuevo
-            # que procesar datos duplicados
+            # CONCEPT: Fail-safe behavior
+
+        # If the checkpoint is corrupted, it's safer to start over than to process duplicate data
             return None
     
     def save_checkpoint(
@@ -98,26 +114,36 @@ class StateManager:
         metadata: Optional[Dict] = None
     ):
         """
-        Guarda un nuevo checkpoint.
-        
-        CONCEPTO: ACID Properties (Atomicity)
-        =====================================
-        Queremos que el guardado sea atómico:
-        - Se guarda todo o nada
-        - No queremos checkpoints corruptos o a medias
-        
-        Técnica: Write-then-rename
-        1. Escribimos a archivo temporal
-        2. Si todo OK, renombramos a archivo final
-        3. Rename es operación atómica en filesystems
-        
-        En Databricks: Delta Lake hace esto automáticamente con transaction log
-        
+       Save a new checkpoint.
+
+        CONCEPT: ACID Properties (Atomicity)
+
+        ====================================
+        We want the saving to be atomic:
+
+        - Save everything or nothing
+
+        - We don't want corrupted or incomplete checkpoints
+
+        Technique: Write-then-rename
+
+        1. Write to a temporary file
+
+        2. If everything is OK, rename to a final file
+
+        3. Renaming is an atomic operation in filesystems
+
+        In Databricks: Delta Lake does this automatically with the transaction log
+
         Args:
-            last_timestamp: Último timestamp procesado exitosamente
-            records_processed: Cantidad de registros procesados
-            status: success | failed | partial
-            metadata: Cualquier data adicional (ej: errores, warnings)
+
+        last_timestamp: Last timestamp successfully processed
+
+        records_processed: Number of records processed
+
+        status: success | failed | partial
+
+        metadata: Any additional data (e.g., errors, warnings)
         """
         checkpoint = {
             'last_processed_timestamp': last_timestamp,
@@ -149,18 +175,23 @@ class StateManager:
     
     def get_last_processed_timestamp(self) -> Optional[str]:
         """
-        Obtiene el último timestamp procesado.
-        
-        CONCEPTO: Incremental Load Pattern
-        ===================================
-        Esta es la función clave para incremental processing:
-        1. Obtenemos último timestamp procesado
-        2. Le decimos a la API: "dame todo DESPUÉS de esto"
-        3. Procesamos solo lo nuevo
-        4. Guardamos nuevo checkpoint
-        
+        Gets the last processed timestamp.
+
+        CONCEPT: Incremental Load Pattern
+
+        ==================================
+        This is the key function for incremental processing:
+
+        1. Get the last processed timestamp
+
+        2. Tell the API: "give me everything AFTER this"
+
+        3. Process only the new data
+
+        4. Save the new checkpoint
+
         Returns:
-            ISO 8601 timestamp string, o None si es primera ejecución
+        ISO 8601 timestamp string, or None if it's the first execution
         """
         checkpoint = self.load_checkpoint()
         
@@ -171,16 +202,20 @@ class StateManager:
     
     def mark_failed(self, error_message: str):
         """
-        Marca una ejecución como fallida sin avanzar el checkpoint.
-        
-        CONCEPTO: Fault Tolerance
-        =========================
-        Si el pipeline falla:
-        - NO avanzamos el checkpoint
-        - Guardamos el error para debugging
-        - Próxima ejecución reintentará desde el mismo punto
-        
-        Esto garantiza que no perdemos datos si algo falla.
+        Mark an execution as failed without advancing the checkpoint.
+
+        CONCEPT: Fault Tolerance
+
+        ========================
+        If the pipeline fails:
+
+        - We do NOT advance the checkpoint
+
+        - We save the error for debugging
+
+        - The next execution will retry from the same point
+
+        This ensures that we do not lose data if something fails.
         """
         checkpoint = self.load_checkpoint() or {}
         
@@ -198,18 +233,25 @@ class StateManager:
     
     def get_stats(self) -> Dict:
         """
-        Obtiene estadísticas del pipeline.
-        
-        CONCEPTO: Observability
-        =======================
-        En producción necesitamos saber:
-        - ¿Cuándo corrió por última vez?
-        - ¿Cuántos registros procesó?
-        - ¿Hubo errores?
-        
-        Esto se usa para:
-        - Dashboards de monitoring
-        - Alertas (ej: "hace 24hs que no corre")
+        Obtains pipeline statistics.
+
+        CONCEPT: Observability
+
+        ======================
+        In production, we need to know:
+
+        - When did it last run?
+
+        - How many records did it process?
+
+        - Were there any errors?
+
+        This is used for:
+
+        - Monitoring dashboards
+
+        - Alerts (e.g., "hasn't run in 24 hours")
+
         - Debugging
         """
         checkpoint = self.load_checkpoint()
@@ -231,17 +273,22 @@ class StateManager:
 
 class RunTracker:
     """
-    CONCEPTO: Execution Tracking
-    =============================
-    Además del checkpoint (estado del pipeline),
-    queremos trackear cada ejecución individual.
-    
-    Esto es útil para:
-    - Ver histórico de ejecuciones
-    - Detectar degradación de performance
-    - Auditoría completa
-    
-    En Databricks: Esto lo hace Databricks Workflows automáticamente
+   CONCEPT: Execution Tracking
+
+        =============================
+        In addition to the checkpoint (pipeline status),
+
+        we want to track each individual execution.
+
+        This is useful for:
+
+        - Viewing execution history
+
+        - Detecting performance degradation
+
+        - Complete auditing
+
+        In Databricks: Databricks Workflows does this automatically.
     """
     
     def __init__(self, state_dir: str = "data/state"):
@@ -250,10 +297,11 @@ class RunTracker:
     
     def start_run(self) -> str:
         """
-        Inicia tracking de una ejecución.
-        
+       Start tracking an execution.
+
         Returns:
-            run_id: UUID único para esta ejecución
+
+        run_id: Unique UUID for this execution
         """
         import uuid
         run_id = str(uuid.uuid4())
@@ -266,15 +314,20 @@ class RunTracker:
     
     def end_run(self, records_processed: int, status: str, error: Optional[str] = None):
         """
-        Finaliza tracking de una ejecución.
-        
+        Ends tracking of an execution.
+
         BEST PRACTICE: JSONL format
-        ===========================
-        Usamos JSONL (JSON Lines) en lugar de JSON array porque:
-        - Cada línea es un JSON independiente
-        - Append-only (no necesitamos reescribir todo el archivo)
-        - Fácil de procesar en streaming
-        - Compatible con herramientas como jq, pandas, Spark
+
+        ==========================
+        We use JSONL (JSON Lines) instead of JSON arrays because:
+
+        - Each line is an independent JSON object
+
+        - Append-only (we don't need to rewrite the entire file)
+
+        - Easy to process in streaming
+
+        - Compatible with tools like jq, pandas, and Spark
         """
         end_time = datetime.utcnow()
         duration = (end_time - self.start_time).total_seconds()

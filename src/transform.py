@@ -1,24 +1,25 @@
 """
 transform.py - Data Transformation Module
 
-CONCEPTO FUNDAMENTAL: Data Quality & Transformation
-===================================================
-Los datos de APIs raramente están listos para análisis directo.
-Necesitamos:
-1. Limpiar (null handling, deduplicación)
-2. Validar (schema, tipos de datos)
-3. Enriquecer (agregar campos calculados)
-4. Filtrar (solo lo relevante)
+FUNDAMENTAL CONCEPT: Data Quality & Transformation
+====================================================
+API data is rarely ready for direct analysis.
 
-MEDALLION ARCHITECTURE (patrón de Databricks)
-=============================================
+We need:
+1. Clean (null handling, deduplication)
+2. Validate (schema, data types)
+3. Enrich (add calculated fields)
+4. Filter (only relevant data)
+
+MEDALLION ARCHITECTURE (Databricks pattern)
+==============================================
 Bronze → Silver → Gold
 
-Bronze (Raw): Datos tal cual vienen de la API
-Silver (Curated): Datos limpios, validados, dedupicados
-Gold (Metrics): Agregaciones y métricas para análisis
+Bronze (Raw): Data as received from the API
+Silver (Curated): Clean, validated, and deduplicated data
+Gold (Metrics): Aggregations and metrics for analysis
 
-Este módulo hace la transformación Bronze → Silver
+This module performs the Bronze → Silver transformation
 """
 
 from typing import List, Dict, Optional, Set
@@ -31,25 +32,25 @@ logger = logging.getLogger(__name__)
 
 class EventTransformer:
     """
-    CONCEPTO: Single Responsibility
+   CONCEPT: Single Responsibility
     ================================
-    Esta clase SOLO transforma datos.
-    No los trae (eso es fetch.py) ni los persiste (eso es main.py).
+    This class ONLY transforms data.
+    It doesn't bring them (that's fetch.py) or persist them (that's main.py).
     
-    Ventajas:
-    - Fácil de testear (inputs y outputs claros)
-    - Reutilizable en otros pipelines
-    - Cambios en transformación no afectan ingesta
+    Advantages:
+    - Easy to test (clear inputs and outputs)
+    - Reusable in other pipelines
+    - Changes in transformation do not affect intake
     """
     
     def __init__(self, event_types_filter: Optional[List[str]] = None):
         """
-        Args:
-            event_types_filter: Lista de tipos de eventos a mantener
-                               None = mantener todos
+        Args
+            event_types_filter: List of event types to maintain
+                               None = keep all
         
-        CONCEPTO: Configuration over Code
-        Pasamos configuración como parámetro, no hardcodeado.
+        CONCEPT: Configuration over Code
+        We pass configuration as a parameter, not hardcoded.
         """
         self.event_types_filter = event_types_filter
         
@@ -60,22 +61,22 @@ class EventTransformer:
     
     def clean_event(self, event: Dict) -> Optional[Dict]:
         """
-        Limpia y valida un evento individual.
+        Cleans and validates an individual event.
         
-        CONCEPTO: Data Quality Checks
+        CONCEPT: Data Quality Checks
         ==============================
-        Aplicamos reglas de calidad:
-        1. ¿Tiene los campos requeridos?
-        2. ¿Los tipos de datos son correctos?
-        3. ¿Los valores tienen sentido? (ej: fecha no en el futuro)
+        We apply quality rules:
+        1. Do you have the required fields?
+        2. Are the data types correct?
+        3. Do values make sense? (ex: date not in the future)
         
-        En producción esto se expande con:
+        In production this expands with:
         - Schema validation (Pydantic, Great Expectations)
         - Data profiling
-        - Alertas de calidad
+        - Quality alerts
         
         Returns:
-            Evento limpio, o None si no pasa validación
+            Clean event, or None if it does not pass validation
         """
         # VALIDACIÓN 1: Campos requeridos
         required_fields = ['id', 'type', 'created_at', 'repo']
@@ -137,14 +138,14 @@ class EventTransformer:
     
     def _normalize_timestamp(self, ts: str) -> str:
         """
-        Normaliza timestamp a formato ISO 8601.
+        Standardize timestamp to ISO 8601 format.
         
-        CONCEPTO: Data Standardization
+        CONCEPT: Data Standardization
         ===============================
-        APIs pueden devolver timestamps en diferentes formatos.
-        Normalizamos TODO a ISO 8601 (formato universal).
+        APIs can return timestamps in different formats.
+        We standardize EVERYTHING to ISO 8601 (universal format).
         
-        En Databricks: TimestampType hace esto automáticamente.
+        In Databricks: TimestampType does this automatically.
         """
         try:
             # GitHub usa ISO 8601, pero validamos
@@ -157,18 +158,18 @@ class EventTransformer:
     
     def _compute_hash(self, event: Dict) -> str:
         """
-        Calcula hash del contenido del evento.
+       Calculates hash of the event content.
         
-        CONCEPTO: Content-based Deduplication
+        CONCEPT: Content-based Deduplication
         =====================================
-        Dos eventos pueden tener diferentes IDs pero mismo contenido
-        (ej: duplicado por retry de API).
+        Two events can have different IDs but same content
+        (ex: duplicate by API retry).
         
-        Hash nos permite detectar duplicados por CONTENIDO,
-        no solo por ID.
+        Hash allows us to detect duplicates by CONTENT,
+        not just by ID.
         
-        En Databricks: Delta Lake puede hacer esto con MERGE usando
-        hash columns como parte de la key.
+        In Databricks: Delta Lake can do this with MERGE USING
+        hash columns as part of the key.
         """
         import json
         
@@ -182,21 +183,21 @@ class EventTransformer:
     
     def transform_batch(self, events: List[Dict]) -> List[Dict]:
         """
-        Transforma un batch de eventos.
+        Transform a batch of events.
         
-        CONCEPTO: Batch Processing
+        CONCEPT: Batch Processing
         ==========================
-        Procesamos múltiples registros en un solo paso.
-        Esto es más eficiente que procesar uno a la vez.
+        We process multiple records in a single step.
+        This is more efficient than processing one at a time.
         
-        En Spark/Databricks: esto se paraleliza automáticamente
+        In Spark/Databricks: this automatically parallels
         across partitions.
         
         Args:
-            events: Lista de eventos crudos (Bronze)
+            events: List of raw events (Bronze)
             
         Returns:
-            Lista de eventos limpios (Silver)
+            Clean Events List (Silver)
         """
         cleaned_events = []
         
@@ -228,20 +229,7 @@ class EventTransformer:
     
     def extract_payload_features(self, event: Dict) -> Dict:
         """
-        Extrae features específicas del payload según tipo de evento.
-        
-        CONCEPTO: Schema-on-Read
-        ========================
-        GitHub events tienen payloads diferentes según el tipo.
-        PushEvent tiene 'commits', PullRequestEvent tiene 'pull_request', etc.
-        
-        En lugar de un schema rígido, extraemos features relevantes
-        al momento de leerlos (schema-on-read vs schema-on-write).
-        
-        En Databricks: Esto se puede hacer con:
-        - Funciones de parsing (get_json_object)
-        - Schema evolution de Delta Lake
-        - Variant types (para datos semi-estructurados)
+       QUERY LENGTH LIMIT EXCEEDED. MAX ALLOWED QUERY : 500 CHARS
         """
         event_type = event.get('event_type')
         payload = event.get('payload', {})
@@ -278,16 +266,16 @@ class EventTransformer:
     
     def enrich_event(self, event: Dict) -> Dict:
         """
-        Enriquece evento con features adicionales.
+       Enrich the event with additional features.
         
-        CONCEPTO: Feature Engineering
+        CONCEPT: Feature Engineering
         ==============================
-        Agregamos campos calculados que facilitan análisis:
-        - Categorización
-        - Banderas booleanas
-        - Features derivadas
+        We add calculated fields that facilitate analysis:
+        - Categorization
+        - Boolean flags
+        - Derived Features
         
-        En ML pipelines, este paso es crítico para modelos.
+        In ML pipelines, this step is critical for models.
         """
         enriched = event.copy()
         

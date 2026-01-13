@@ -1,20 +1,21 @@
 """
 metrics.py - Metrics & Aggregation Module
 
-CONCEPTO FUNDAMENTAL: Aggregation Layer (Gold)
-==============================================
-En Medallion Architecture:
+FUNDAMENTAL CONCEPT: Aggregation Layer (Gold)
+===============================================
+In Medallion Architecture:
 - Bronze: Raw data
 - Silver: Cleaned data
 - Gold: Aggregated metrics ready for consumption
 
-Este módulo implementa la capa Gold.
-Transforma datos granulares en insights agregados.
+This module implements the Gold layer.
 
-En Databricks:
-- Delta Live Tables hace esto declarativamente
-- Aggregate tables optimizadas para queries
-- Materialized views para performance
+It transforms granular data into aggregated insights.
+
+In Databricks:
+- Delta Live Tables does this declaratively
+- Aggregate tables optimized for queries
+- Materialized views for performance
 """
 
 from typing import List, Dict
@@ -27,37 +28,46 @@ logger = logging.getLogger(__name__)
 
 class MetricsCalculator:
     """
-    CONCEPTO: Aggregation Patterns
+    CONCEPT: Aggregation Patterns
+
     ===============================
-    Los analytics típicamente necesitan agregaciones:
-    - COUNT: ¿Cuántos eventos por tipo?
-    - SUM: ¿Total de commits?
-    - GROUP BY: ¿Actividad por repo? ¿Por usuario?
-    - TIME SERIES: ¿Tendencias por hora/día?
-    
-    Este patrón es idéntico en SQL, Pandas, Spark:
+    Analytics typically require aggregations:
+
+    - COUNT: How many events per type?
+
+    - SUM: Total commits?
+
+    - GROUP BY: Activity per repo? Per user?
+
+    - TIME SERIES: Trends by hour/day?
+
+    This pattern is identical in SQL, Pandas, and Spark:
+
     SELECT repo, COUNT(*) FROM events GROUP BY repo
     """
     
     def __init__(self):
         """
-        Inicializa acumuladores para métricas.
-        
-        CONCEPTO: Accumulators
-        ======================
-        Mantenemos contadores en memoria mientras procesamos el batch.
-        En Spark distribuido: cada worker mantiene su accumulator,
-        luego se combinan (reduce).
+       Initializes accumulators for metrics.
+
+        CONCEPT: Accumulators
+
+        =====================
+        We keep counters in memory while processing the batch.
+
+        In distributed Spark: each worker maintains its own accumulator,
+
+        then they are combined (reduced).
         """
         self.metrics = {}
     
     def calculate_event_type_metrics(self, events: List[Dict]) -> Dict:
         """
-        Métricas por tipo de evento.
+        Metrics by event type.
         
-        CONCEPTO: Group By Aggregation
+        CONCEPT: Group By Aggregation
         ===============================
-        SQL equivalente:
+        Equivalent SQL:
         SELECT event_type, COUNT(*) as count
         FROM events
         GROUP BY event_type
@@ -76,22 +86,29 @@ class MetricsCalculator:
     
     def calculate_repo_metrics(self, events: List[Dict]) -> Dict:
         """
-        Métricas por repositorio.
-        
-        CONCEPTO: Multi-dimensional Aggregation
-        ========================================
-        Agregamos por repo Y por tipo de evento.
-        
-        SQL equivalente:
-        SELECT 
-            repo_name,
+       Metrics per repository.
+
+            CONCEPT: Multi-dimensional Aggregation
+
+            =======================================
+            We aggregate by repository AND by event type.
+
+            Equivalent SQL:
+
+            SELECT repo_name,
+
             COUNT(*) as total_events,
+
             COUNT(DISTINCT actor_login) as unique_contributors,
+
             COUNT(CASE WHEN is_active_contribution THEN 1 END) as active_events
-        FROM events
-        GROUP BY repo_name
-        
-        En Spark: esto se paralelizaría por particiones de repo.
+
+            FROM events
+
+            GROUP BY repo_name
+
+            In Spark: this would be parallelized by repository partitions.
+
         """
         repo_stats = defaultdict(lambda: {
             'total_events': 0,
@@ -125,8 +142,9 @@ class MetricsCalculator:
             if stats['last_event'] is None or event_time > stats['last_event']:
                 stats['last_event'] = event_time
         
-        # CONCEPTO: Serializable Metrics
-        # Convertimos sets a listas para poder guardar como JSON
+        # CONCEPT: Serializable Metrics
+
+        # We convert sets to lists so we can save them as JSON
         serializable_stats = {}
         for repo, stats in repo_stats.items():
             serializable_stats[repo] = {
@@ -144,23 +162,32 @@ class MetricsCalculator:
     
     def calculate_contributor_metrics(self, events: List[Dict]) -> Dict:
         """
-        Métricas por contributor.
-        
-        CONCEPTO: User Analytics
-        ========================
-        Útil para identificar:
-        - Contributors más activos
-        - Patterns de contribución
-        - Diversidad de actividades
-        
-        SQL equivalente:
-        SELECT 
-            actor_login,
-            COUNT(*) as total_contributions,
-            COUNT(DISTINCT repo_name) as repos_contributed_to,
-            MAX(created_at) as last_activity
+       Metrics per contributor
+
+        CONCEPT: User Analytics
+
+        Useful for identifying:
+
+        - Most active contributors
+
+        - Contribution patterns
+
+        - Diversity of activities
+
+        Equivalent SQL:
+
+        SELECT actor_login,
+
+        COUNT(*) as total_contributions,
+
+        COUNT(DISTINCT repo_name) as repos_contributed_to,
+
+        MAX(created_at) as last_activity
+
         FROM events
+
         WHERE actor_login IS NOT NULL
+
         GROUP BY actor_login
         """
         contributor_stats = defaultdict(lambda: {
@@ -200,18 +227,18 @@ class MetricsCalculator:
     
     def calculate_time_series_metrics(self, events: List[Dict]) -> Dict:
         """
-        Métricas en series de tiempo.
+        Metrics in time series.
         
-        CONCEPTO: Time Series Analysis
+        CONCEPT: Time Series Analysis
         ===============================
-        Agregamos por ventanas de tiempo para ver tendencias.
+        We aggregate by time windows to see trends.
         
-        En Databricks:
-        - Window functions
-        - Tumbling/Sliding windows en Structured Streaming
-        - Time travel queries en Delta Lake
+        In Databricks:
+        -Window functions
+        - Tumbling/Sliding windows in Structured Streaming
+        - Time travel queries in Delta Lake
         
-        SQL equivalente:
+        Equivalent SQL:
         SELECT 
             DATE(created_at) as date,
             HOUR(created_at) as hour,
@@ -268,12 +295,13 @@ class MetricsCalculator:
     
     def calculate_activity_metrics(self, events: List[Dict]) -> Dict:
         """
-        Métricas de actividad (features específicas).
-        
-        CONCEPTO: Domain-Specific Metrics
+        Activity metrics (specific features).
+
+        CONCEPT: Domain-Specific Metrics
+
         ==================================
-        Métricas que tienen sentido para el dominio (GitHub).
-        En otros dominios serían diferentes (ej: e-commerce = revenue, conversions)
+        Metrics that are relevant to the domain (GitHub).
+        In other domains, they would be different (e.g., e-commerce = revenue, conversions).
         """
         activity_stats = {
             'total_events': len(events),
@@ -304,20 +332,26 @@ class MetricsCalculator:
     
     def calculate_all_metrics(self, events: List[Dict]) -> Dict:
         """
-        Calcula todas las métricas en un solo paso.
-        
-        CONCEPTO: Single-Pass Aggregation
-        ==================================
-        En lugar de iterar sobre los datos múltiples veces,
-        calculamos todas las métricas en una sola pasada.
-        
-        Esto es crítico para performance en big data:
-        - Menos I/O
-        - Mejor uso de cache
-        - Más eficiente en Spark (menos shuffles)
-        
+        Calculate all metrics in a single pass.
+
+        CONCEPT: Single-Pass Aggregation
+
+        =================================
+
+        Instead of iterating over the data multiple times,
+        we calculate all metrics in a single pass.
+
+        This is critical for big data performance:
+
+        - Less I/O
+
+        - Better cache utilization
+
+        - More efficient in Spark (fewer shuffles)
+
         Returns:
-            Dict con todas las métricas organizadas por categoría
+
+        Dict with all metrics organized by category
         """
         if not events:
             logger.warning("No events to calculate metrics")
@@ -342,13 +376,16 @@ class MetricsCalculator:
     
     def get_top_repos(self, metrics: Dict, top_n: int = 10) -> List[Dict]:
         """
-        Obtiene top N repos por actividad.
-        
-        CONCEPTO: Ranking
+        Gets the top N repositories per activity.
+
+        CONCEPT: Ranking
+
         =================
-        Ordenamos y tomamos top N.
-        En SQL: ORDER BY ... LIMIT N
-        En Spark: orderBy(...).limit(N)
+        We order and take the top N.
+
+        In SQL: ORDER BY ... LIMIT N
+
+        In Spark: orderBy(...).limit(N)
         """
         repos = metrics.get('repos', {})
         
@@ -365,7 +402,7 @@ class MetricsCalculator:
     
     def get_top_contributors(self, metrics: Dict, top_n: int = 10) -> List[Dict]:
         """
-        Obtiene top N contributors por actividad.
+        It obtains top N contributors per activity.
         """
         contributors = metrics.get('contributors', {})
         
