@@ -6,6 +6,15 @@ __pycache__/
 # C extensions
 *.so
 
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+# =====================================
+# Data pipeline outputs (DO NOT COMMIT)
+# =====================================
+data/
 # Distribution / packaging
 .Python
 build/
