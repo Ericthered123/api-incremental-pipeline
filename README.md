@@ -6,7 +6,7 @@ A production-ready data pipeline demonstrating incremental processing, data qual
 ## Project Overview
 This project implements an incremental data pipeline that ingests events from GitHub's public API, processes them through a medallion architecture (Bronze → Silver → Gold), and generates analytics-ready metrics.
 
-## Why This Approach?
+## Why This Approach?,
 
 Incremental processing: Only processes new data, reducing costs and improving efficiency
 Idempotent design: Multiple runs with same input produce same output
